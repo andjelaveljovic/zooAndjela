@@ -1,7 +1,5 @@
 package rs.raf.pds.faulttolerance.gRPC;
 
-import io.grpc.stub.StreamObserver;
-
 import static io.grpc.MethodDescriptor.generateFullMethodName;
 
 /**
@@ -424,7 +422,7 @@ public final class AccountServiceGrpc {
     /**
      */
     public java.util.Iterator<rs.raf.pds.faulttolerance.gRPC.LogEntry> missingEntry(
-            LogRequest request, StreamObserver<LogEntry> streamObserver) {
+            LogRequest request) {
       return io.grpc.stub.ClientCalls.blockingServerStreamingCall(
           getChannel(), getMissingEntryMethod(), getCallOptions(), request);
     }

@@ -1,6 +1,7 @@
 package rs.raf.pds.faulttolerance;
 
 import java.io.IOException;
+import java.util.Iterator;
 import java.util.List;
 
 import com.google.protobuf.ByteString;
@@ -126,7 +127,6 @@ public class AccountServiceGRPCServer extends AccountServiceImplBase  {
 
 		responseObserver.onCompleted();
 	}
-	@SuppressWarnings("ResultOfMethodCallIgnored")
 	public void requestMissingLogs(Long lastKnownIndex) {
 		if (leaderStub == null) {
 			initializeLeaderStub();
@@ -136,37 +136,31 @@ public class AccountServiceGRPCServer extends AccountServiceImplBase  {
 				.setLaskKnownIndex(lastKnownIndex)
 				.build();
 
-		System.out.println("FOLLOWER SALJE ZAHETV ZA LOG") ;
+		System.out.println("FOLLOWER SALJE ZAHTEV ZA LOG");
 
-		leaderStub.missingEntry(request, new StreamObserver<LogEntry>() {
-			@Override
-			public void onNext(LogEntry logEntry) {
-				System.out.println("FOLLOWER DOBIJA OD LIDERA" + logEntry.getEntryAtIndex()) ;
+		// Блокирајући позив са лидеру
+		try {
+			Iterator<LogEntry> response = leaderStub.missingEntry(request);
+
+			while (response.hasNext()) {
+				LogEntry logEntry = response.next();
+				System.out.println("FOLLOWER DOBIJA OD LIDERA " + logEntry.getEntryAtIndex());
 
 				byte[] data = logEntry.getLogEntryData().toByteArray();
-                try {
-                    service.appendLog(lastKnownIndex +1, data);
-					System.out.println("FOLLOWER POKUSAVA DA DODA SVOM LOGU") ;
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-
-
+				service.appendLog(lastKnownIndex + 1, data);
+				System.out.println("FOLLOWER POKUSAVA DA DODA SVOM LOGU");
 			}
 
-			@Override
-			public void onError(Throwable throwable) {
+			System.out.println("Finished receiving missing logs from leader.");
 
-				throwable.printStackTrace();
-			}
-
-			@Override
-			public void onCompleted() {
-				// Handle completion of the RPC call
-				System.out.println("Finished receiving missing logs from leader.");
-			}
-		});
+		} catch (RuntimeException | IOException e) {
+			e.printStackTrace();
+			// Управаљање грешком, као што је пријављивање грешке или поновно слање захтева
+		}
 	}
+
+
+
 
 	private void initializeLeaderStub() {
 		String leaderAddress = node.getLeaaderGRPCAddress();
@@ -177,6 +171,7 @@ public class AccountServiceGRPCServer extends AccountServiceImplBase  {
 
 		leaderStub = AccountServiceGrpc.newBlockingStub(channel);
 	}
+
 	@Override
 	public void getLeaderInfo(LeaderRequest req, StreamObserver<LeaderInfo> response) {
 		LeaderInfo leader = null;

@@ -202,11 +202,15 @@ public class AppServer extends SyncPrimitive implements Runnable, ReplicatedLog.
             }
         }
 	}
+
 	public void election() throws KeeperException, InterruptedException {
 		checkReplicaCandidate();
 
+
 	}
-	
+
+
+
 	@Override
 	public void run() {
 		while(running) {
@@ -228,6 +232,7 @@ public class AppServer extends SyncPrimitive implements Runnable, ReplicatedLog.
 		}
 		
 	}
+
 
 	public void start() {
 		if (!running) {
@@ -276,11 +281,13 @@ public class AppServer extends SyncPrimitive implements Runnable, ReplicatedLog.
           .addService(new AccountServiceGRPCServer(accService, node)).build();
 
         gRPCServer.start();
+
  
               
         try{
 	        node.election();
 	        node.start();
+
 	        	        	        
 	        gRPCServer.awaitTermination();
 	        

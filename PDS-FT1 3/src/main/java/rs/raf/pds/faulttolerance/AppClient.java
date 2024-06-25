@@ -27,67 +27,119 @@ public class AppClient extends SyncPrimitive {
 	public void process(WatchedEvent event) {
 		try {
 			checkLeader();
+
+
 		} catch (KeeperException | InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
-	private boolean checkCurrentLeader(AccountServiceGrpc.AccountServiceBlockingStub blockingStub) {
-		LeaderRequest request = LeaderRequest.newBuilder().build();
-		LeaderInfo leaderInfo = blockingStub.getLeaderInfo(request);
-		return leaderInfo.getHostnamePort().equals(leaderHostNamePort);
+
+	private boolean checkCurrentLeader(String leaderHostNamePort) {
+		/*LeaderRequest request = LeaderRequest.newBuilder().build();
+		try {
+			LeaderInfo leaderInfo = blockingStub.getLeaderInfo(request);
+			return leaderInfo.getHostnamePort().equals(leaderHostNamePort);
+		} catch (Exception e) {
+			// Log the error
+			System.err.println("Error checking current leader: " + e.getMessage());
+			return false; // Indicate that the leader check failed
+		}*/
+		ManagedChannel channel = null;
+		try {
+			String[] splits = leaderHostNamePort.split(":");
+			channel = ManagedChannelBuilder.forAddress(splits[0], Integer.parseInt(splits[1]))
+					.usePlaintext()
+					.build();
+
+			AccountServiceGrpc.AccountServiceBlockingStub blockingStub = AccountServiceGrpc.newBlockingStub(channel);
+			LeaderRequest request = LeaderRequest.newBuilder().build();
+			LeaderInfo leaderInfo = blockingStub.getLeaderInfo(request);
+			if(leaderInfo.getHostnamePort().equals(leaderHostNamePort)){
+				return true;
+
+
+
+
+			} else {
+				System.out.println("Leader is not active.");
+				return false;
+			}
+		} catch (Exception e) {
+			System.out.println("Error while checking leader activity: " + e.getMessage());
+			return false;
+		} finally {
+			// Ensure proper shutdown of the channel
+			if (channel != null) {
+				channel.shutdown();
+			}
+		}
 	}
-    public synchronized void checkLeader() throws KeeperException, InterruptedException {
+
+	public synchronized void checkLeader() throws KeeperException, InterruptedException {
 		//Thread.sleep(100);
     	List<String> list = zk.getChildren(appRoot, false);
         System.out.println("There are total:"+list.size()+ " replicas for elections!");
-        for (int i=0; i<list.size(); i++) 
+        for (int i=0; i<list.size(); i++)
         	System.out.print("NODE:"+list.get(i)+", ");
         System.out.println();
-        
+
         if (list.size() == 0) {
             System.out.println("0 Elemenata ? ");
         } else {
-            Integer minValue = Integer.parseInt(list.get(0).substring(AppServer.REPLICA_NODE_SEQUENCE_INDEX));
-            String minNodeName = list.get(0);
-            
-            for(int i=1; i<list.size(); i++) {
-            	Integer tempValue = Integer.parseInt(list.get(i).substring(AppServer.REPLICA_NODE_SEQUENCE_INDEX));
-                if(minValue > tempValue) {
-                  minValue = tempValue;
-                  minNodeName = list.get(i);
-                }
-            }
-            if (leaderNodeName == null || !minNodeName.equals(leaderNodeName)) {
-            	leaderNodeName = minNodeName;
-            	byte[] b = zk.getData(appRoot + "/" + leaderNodeName, true, null);
-            	leaderHostNamePort = new String(b);
+			System.out.println("Posle totala, prvi deo");
+			Integer minValue = Integer.parseInt(list.get(0).substring(AppServer.REPLICA_NODE_SEQUENCE_INDEX));
+			String minNodeName = list.get(0);
 
-				System.out.println("Leader je "+leaderNodeName);
-				System.out.println("**************");
-				blockingStub = getBlockingStub(leaderHostNamePort);
-				if (!checkCurrentLeader(blockingStub)) {
-					System.out.println("Detected leader mismatch. Re-checking leader...");
-					checkLeader();
-				}else{
-					System.out.println("Leader active...");
+			for (int i = 1; i < list.size(); i++) {
+
+				Integer tempValue = Integer.parseInt(list.get(i).substring(AppServer.REPLICA_NODE_SEQUENCE_INDEX));
+				if (minValue > tempValue) {
+					minValue = tempValue;
+					minNodeName = list.get(i);
 				}
-            	
-            	//if (channel != null)
-            	//	channel.shutdown();
-            	
+			}
+			if (leaderNodeName == null || !minNodeName.equals(leaderNodeName) ) {
+				System.out.println("Posle totala, drugi deo postavljanja novog lidera");
+				leaderNodeName = minNodeName;
+				byte[] b = zk.getData(appRoot + "/" + leaderNodeName, true, null);
+				leaderHostNamePort = new String(b);
 
-            }
-        }
-	}
-    public  AccountServiceGrpc.AccountServiceBlockingStub getBlockingStub(String hostNamePort){
-		String[] splits = hostNamePort.split(":");
-		channel = ManagedChannelBuilder.forAddress(splits[0], Integer.parseInt(splits[1]))
-	          .usePlaintext()
-	          .build();
+				System.out.println("Leader je " + leaderNodeName);
+				System.out.println("**************");
+				//blockingStub = getBlockingStub(leaderHostNamePort);
+			}
+			else if(!checkCurrentLeader(leaderHostNamePort)){
+				System.out.println("Leader is not active yet. Waiting...");
 
-	    return AccountServiceGrpc.newBlockingStub(channel);
-	}
+				Thread.sleep(3000);
+				checkLeader();
+
+			}else{
+				blockingStub = getBlockingStub(leaderHostNamePort);
+
+				}
+			}
+
+				//if (channel != null)
+				//	channel.shutdown();
+
+
+			}
+
+
+
+
+
+public  AccountServiceGrpc.AccountServiceBlockingStub getBlockingStub(String hostNamePort){//grpc za odredjeni port i host, tj od naseg do lidera, znaci klijent sa serverom komunicira preko grpc-a
+	String[] splits = hostNamePort.split(":");
+	channel = ManagedChannelBuilder.forAddress(splits[0], Integer.parseInt(splits[1]))
+			.usePlaintext()
+			.build();
+
+	return AccountServiceGrpc.newBlockingStub(channel);
+}
+/*
 	private void inviteServer() throws KeeperException, InterruptedException {
 		for (int i=0; i<10; i++) {
 	        try { 
@@ -104,6 +156,8 @@ public class AppClient extends SyncPrimitive {
 	        	//channel.shutdown();
 	        	
 	        	checkLeader();
+
+
       	
 	        } catch (InterruptedException e) {
 				// TODO Auto-generated catch block
@@ -111,8 +165,29 @@ public class AppClient extends SyncPrimitive {
 			}
 		}
          
-        channel.shutdown();
+
+	}*/
+private void inviteServer() throws KeeperException, InterruptedException {
+	try {
+		blockingStub = getBlockingStub(leaderHostNamePort);
+		for (int i = 0; i < 10; i++) {
+			inviteServerFunctions(blockingStub);
+			Thread.sleep(2000);
+			System.out.println("Leader je " + leaderNodeName);
+		}
+	} catch (RuntimeException e) {
+		System.out.println("Server has crashed!");
+		e.printStackTrace();
+		checkLeader(); // Recheck and establish connection to new leader
+	} catch (InterruptedException e) {
+		e.printStackTrace();
+	} finally {
+		if (channel != null && !channel.isShutdown()) {
+			channel.shutdown();
+		}
 	}
+}
+
 	public static void main(String[] args) {
         
 		if (args.length != 1) {
