@@ -27,6 +27,7 @@ public class AppClient extends SyncPrimitive {
 	public void process(WatchedEvent event) {
 		try {
 			checkLeader();
+			getAmountFromFollowers();
 
 
 		} catch (KeeperException | InterruptedException e) {
@@ -77,8 +78,8 @@ public class AppClient extends SyncPrimitive {
 	}
 
 	public synchronized void checkLeader() throws KeeperException, InterruptedException {
-		//Thread.sleep(100);
-    	List<String> list = zk.getChildren(appRoot, false);
+		Thread.sleep(100);
+    	List<String> list = zk.getChildren(appRoot, true);
         System.out.println("There are total:"+list.size()+ " replicas for elections!");
         for (int i=0; i<list.size(); i++)
         	System.out.print("NODE:"+list.get(i)+", ");
@@ -99,7 +100,7 @@ public class AppClient extends SyncPrimitive {
 					minNodeName = list.get(i);
 				}
 			}
-			if (leaderNodeName == null || !minNodeName.equals(leaderNodeName) ) {
+			if (true ) {
 				System.out.println("Posle totala, drugi deo postavljanja novog lidera");
 				leaderNodeName = minNodeName;
 				byte[] b = zk.getData(appRoot + "/" + leaderNodeName, true, null);
@@ -200,6 +201,7 @@ private void inviteServer() throws KeeperException, InterruptedException {
 			client = new AppClient(args[0], AppServer.APP_ROOT_NODE);
 			client.checkLeader();
 			client.inviteServer();
+
 			
 			
 		} catch (KeeperException | InterruptedException e) {
@@ -210,8 +212,53 @@ private void inviteServer() throws KeeperException, InterruptedException {
 		
 		
     }
-	
-	
+	public void getAmountFromFollowers() throws KeeperException, InterruptedException {
+		List<String> nodes = zk.getChildren(appRoot, false);
+		for (String node : nodes) {
+			byte[] data = zk.getData(appRoot + "/" + node, false, null);
+			String followerHostNamePort = new String(data);
+			System.out.println("Checking follower: " + followerHostNamePort);
+			sendGetAmountRequest(followerHostNamePort);
+		}
+	}
+
+	private void sendGetAmountRequest(String followerHostNamePort) {
+		ManagedChannel channel = null;
+		try {
+			String[] splits = followerHostNamePort.split(":");
+			channel = ManagedChannelBuilder.forAddress(splits[0], Integer.parseInt(splits[1]))
+					.usePlaintext()
+					.build();
+
+			AccountServiceGrpc.AccountServiceBlockingStub blockingStub = AccountServiceGrpc.newBlockingStub(channel);
+			AccountRequest request = AccountRequest.newBuilder()
+					.setRequestId(1)
+					.setOpType(AccountRequestType.GET)
+					.build();
+			AccountResponse response = blockingStub.getAmount(request);
+			handleResponse(response, request);
+		} catch (Exception e) {
+			System.out.println("Error while sending getAmount request: " + e.getMessage());
+		} finally {
+			if (channel != null) {
+				channel.shutdown();
+			}
+		}
+	}
+	private void handleResponse(AccountResponse response, AccountRequest request) {
+		if (response.getStatus() == RequestStatus.STATUS_OK) {
+			System.out.println("Follower odogovara na poziv get: STATUS OK! REQUEST = " + request.getOpType() + ", AMOUNT = " + response.getBalance());
+		} else if (response.getStatus() == RequestStatus.UPDATE_REJECTED_NOT_LEADER) {
+			System.out.println("Follower odogovara na poziv get:UPDATE_REJECTED_NOT_LEADER! " + response.getMessage());
+		} else if (response.getStatus() == RequestStatus.WITDRAWAL_REJECT_NOT_SUFFICIENT_AMOUNT) {
+			System.out.println("Follower odogovara na poziv get:WITDRAWAL_REJECT_NOT_SUFFICIENT_AMOUNT! Amount = " + request.getAmount());
+		} else {
+			System.out.println("Follower odogovara na poziv get:Unhandled status: " + response.getStatus());
+		}
+	}
+
+
+
 	private void inviteServerFunctions(AccountServiceGrpc.AccountServiceBlockingStub blockingStub) {
 		// Poziv AppServer-a preko gRPC-a
         System.out.println("Prvi poziv je getAmount()");

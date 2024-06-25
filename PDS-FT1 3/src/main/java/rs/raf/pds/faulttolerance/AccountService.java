@@ -147,4 +147,7 @@ public class AccountService {
 	}
 
 
+	public long getLastIndex() {
+		return log.lastLogEntryIndex;
+	}
 }
