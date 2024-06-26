@@ -12,6 +12,8 @@ import java.io.IOException;
 
 public class ReplicatedLog {
 
+
+
 	public static interface LogReplicator {
 		public void replicateOnFollowers(Long entryAtIndex, byte[] data);
 	}
@@ -32,6 +34,9 @@ public class ReplicatedLog {
 	public void appendAndReplicate(byte[] data) throws IOException {
 		Long lastLogEntryIndex = appendToLocalLog(data);
 		node.replicateOnFollowers(lastLogEntryIndex, data);  
+	}
+	public void setLastLogEntryIndex(long lastLogIndex) {
+		this.lastLogEntryIndex = lastLogIndex;
 	}
 	
 	protected Long appendToLocalLog(byte[] data) throws IOException {
@@ -68,7 +73,7 @@ public class ReplicatedLog {
 	}
 	// Function to read a specific log entry by index
 	public byte[] readLogEntryByIndex(Long index) throws IOException {
-		if (index < 1 || index > lastLogEntryIndex) {
+		if (index < 0 || index > lastLogEntryIndex) {
 			throw new IllegalArgumentException("Invalid log index");
 		}
 
@@ -76,10 +81,11 @@ public class ReplicatedLog {
 			String line;
 			long currentIndex = 0;
 			while ((line = br.readLine()) != null) {
-				currentIndex++;
+				//currentIndex++;
 				if (currentIndex == index) {
+
 					return line.getBytes();
-				}
+				} currentIndex++;
 			}
 		}
 

@@ -1,10 +1,6 @@
 package rs.raf.pds.faulttolerance;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.io.DataInputStream;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
@@ -17,6 +13,7 @@ import rs.raf.pds.faulttolerance.commands.SubValueCommand;
 import rs.raf.pds.faulttolerance.gRPC.*;
 
 public class AccountService {
+	private static final String SNAPSHOT_FILE_PATH = "accSnapshot.ser";
 
 	ByteArrayInputStream bais;
 	ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -90,7 +87,7 @@ public class AccountService {
 		long currentLogIndex = log.getLastLogEntryIndex();
 		List<LogEntry> logEntries = new ArrayList<>();
 
-		for (long i = lastKnownIndex + 1; i <= currentLogIndex; i++) {
+		for (long i = lastKnownIndex ; i <= currentLogIndex; i++) {
 			byte[] data = log.readLogEntryByIndex(i); // Method to get log entry by index
 			if (data != null) {
 				LogEntry logEntry = LogEntry.newBuilder()
@@ -150,4 +147,80 @@ public class AccountService {
 	public long getLastIndex() {
 		return log.lastLogEntryIndex;
 	}
+
+
+	public synchronized void takeSnapshot() {
+		try {
+			FileOutputStream fileOut = new FileOutputStream(SNAPSHOT_FILE_PATH);
+			ObjectOutputStream out = new ObjectOutputStream(fileOut);
+
+			// Save amount and last log index
+			SnapshotData snapshotData = new SnapshotData(amount, log.getLastLogEntryIndex());
+			out.writeObject(snapshotData);
+
+			out.close();
+			fileOut.close();
+			System.out.println("Snapshot saved successfully");
+		} catch (IOException i) {
+			i.printStackTrace();
+		}
+	}
+	public void loadSnapshot() {
+		try {
+			File snapshotFile = new File(SNAPSHOT_FILE_PATH);
+			if (!snapshotFile.exists() || snapshotFile.length() == 0) {
+				// If snapshot file doesn't exist or is empty, initialize to default values
+				this.amount = 0.0f;
+				log.lastLogEntryIndex = 0L;
+				System.out.println("Snapshot file is empty or doesn't exist. Initializing values to 0.");
+				return;
+			}
+
+			FileInputStream fileIn = new FileInputStream(snapshotFile);
+			ObjectInputStream in = new ObjectInputStream(fileIn);
+
+			// Read the object from the stream
+			Object obj = in.readObject();
+
+			if (obj instanceof SnapshotData) {
+				SnapshotData snapshotData = (SnapshotData) obj;
+				this.amount = snapshotData.getAmount();
+				log.lastLogEntryIndex = snapshotData.getLastLogIndex();
+			} else {
+				System.out.println("Unexpected object type in snapshot file");
+				// Handle the situation where the object read is not of expected type
+				this.amount = 0.0f;
+				log.lastLogEntryIndex = -1L;
+			}
+
+			System.out.println("Loaded last AMOUNT: " + amount);
+			System.out.println("Loaded last LOG INDEX: " + log.lastLogEntryIndex);
+
+			in.close();
+			fileIn.close();
+		} catch (IOException | ClassNotFoundException e) {
+			// Handle exceptions
+			e.printStackTrace();
+		}
+	}
+
+
+	private static class SnapshotData implements Serializable {
+		private final float amount;
+		private final long lastLogIndex;
+
+		public SnapshotData(float amount, long lastLogIndex) {
+			this.amount = amount;
+			this.lastLogIndex = lastLogIndex;
+		}
+
+		public float getAmount() {
+			return amount;
+		}
+
+		public long getLastLogIndex() {
+			return lastLogIndex;
+		}
+	}
+
 }

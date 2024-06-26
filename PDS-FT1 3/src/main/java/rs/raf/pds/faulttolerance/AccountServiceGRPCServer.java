@@ -118,7 +118,7 @@ public class AccountServiceGRPCServer extends AccountServiceImplBase  {
 	}
 	@Override
 	public void missingEntry(LogRequest request, StreamObserver<LogEntry> responseObserver) {
-		System.out.println("LIDER DOBIO ZAHTEV ZA IDEKS: " + request.getLaskKnownIndex()) ;
+		System.out.println("LIDER DOBIO ZAHTEV ZA IDEKS: " + (request.getLaskKnownIndex())) ;
 
 		long lastKnownIndex = request.getLaskKnownIndex();
 		long lastIndex = getLastIndexInReplicatedLog();
@@ -174,11 +174,11 @@ public class AccountServiceGRPCServer extends AccountServiceImplBase  {
 				System.out.println("FOLLOWER DOBIJA OD LIDERA " + logEntry.getEntryAtIndex());
 
 				byte[] data = logEntry.getLogEntryData().toByteArray();
-				service.appendLog(lastKnownIndex + 1, data);
+				service.appendLog(lastKnownIndex, data);
 				System.out.println("FOLLOWER POKUSAVA DA DODA SVOM LOGU");
 			}
 			if (logsUpToDate) {
-				System.out.println("Logs are up to date. Performing up-to-date action.");
+				System.out.println("Logs are up to date.");
 
 				isSynchronizedWithLeader = true;
 			} else {

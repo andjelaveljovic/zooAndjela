@@ -86,7 +86,7 @@ public class AppServer extends SyncPrimitive implements Runnable, ReplicatedLog.
 		zk.getChildren(root, true);
 		
 		accountService.setServerState(true);
-		System.out.println("JA SAM LIDER! al malo sutra");
+		System.out.println("JA SAM LIDER!");
 
 	}
 	public String findNodeNameByChannel(FollowerGRPCChannel targetChannel) {
@@ -283,13 +283,17 @@ public class AppServer extends SyncPrimitive implements Runnable, ReplicatedLog.
 
         gRPCServer.start();
 
+
  
               
         try{
 	        node.election();
 	        node.start();
 
-	        	        	        
+			//accService.loadSnapshot();
+
+			//SnapshotTaker snapshotTaker = new SnapshotTaker();
+			//snapshotTaker.start(accService, logFileName);
 	        gRPCServer.awaitTermination();
 	        
 	        node.stop();

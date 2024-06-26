@@ -10,8 +10,10 @@ import io.grpc.ManagedChannelBuilder;
 import rs.raf.pds.faulttolerance.gRPC.*;
 import rs.raf.pds.zookeeper.core.SyncPrimitive;
 
+
 public class AppClient extends SyncPrimitive {
-	
+
+
 	final String appRoot;
 	String leaderNodeName = null;
 	String leaderHostNamePort;
@@ -195,7 +197,7 @@ private void inviteServer() throws KeeperException, InterruptedException {
 			System.out.println("Usage java -cp PDS-FT1-1.0.jar;.;lib/* rs.raf.pds.faulttolerance.AppClient <zookeeper_server_host:port>");
 		    System.exit(1);
 		}
-		
+
 		AppClient client;
 		try {
 			client = new AppClient(args[0], AppServer.APP_ROOT_NODE);
